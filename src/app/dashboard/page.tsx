@@ -109,15 +109,11 @@ export default function DashboardPage() {
       <section style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
         <div style={box}>
           <div style={{ fontWeight: 700, marginBottom: 10 }}>Biểu đồ lãi theo Model + NCC</div>
-          <FakeBar label="Dell 5300 - NCC A" width="62%" color="#22c55e" />
-          <FakeBar label="Dell 5300 - NCC B" width="74%" color="#16a34a" />
-          <FakeBar label="HP 840 G7 - NCC C" width="68%" color="#22c55e" />
+          <div style={{ color: "#64748b" }}>Chưa có dữ liệu để hiển thị biểu đồ.</div>
         </div>
         <div style={box}>
           <div style={{ fontWeight: 700, marginBottom: 10 }}>Cơ cấu chi phí</div>
-          <Stack label="Nhập" pct={65} color="#ef4444" />
-          <Stack label="Sửa" pct={20} color="#f87171" />
-          <Stack label="Bảo hành" pct={15} color="#fca5a5" />
+          <div style={{ color: "#64748b" }}>Chưa có dữ liệu để hiển thị cơ cấu chi phí.</div>
         </div>
       </section>
 
@@ -153,16 +149,17 @@ function Kpi({ title, value, tone, isMobile }: { title: string; value: string; t
   );
 }
 
-function FakeBar({ label, width, color }: { label: string; width: string; color: string }) {
-  return <div style={{ marginBottom: 8 }}><div style={{ fontSize: 13, marginBottom: 4 }}>{label}</div><div style={{ height: 10, borderRadius: 999, background: "#e5e7eb" }}><div style={{ width, height: "100%", background: color, borderRadius: 999 }} /></div></div>;
-}
-
-function Stack({ label, pct, color }: { label: string; pct: number; color: string }) {
-  return <div style={{ marginBottom: 8 }}><div style={{ fontSize: 13, marginBottom: 4 }}>{label} ({pct}%)</div><div style={{ height: 10, borderRadius: 999, background: "#fee2e2" }}><div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 999 }} /></div></div>;
-}
-
 function ChannelPie({ data }: { data: { name: string; profit: number; color: string }[] }) {
   const total = data.reduce((s, x) => s + x.profit, 0);
+  if (!total) {
+    return (
+      <div style={{ display: "grid", placeItems: "center" }}>
+        <div style={{ width: 200, height: 200, borderRadius: "50%", background: "#f1f5f9", display: "grid", placeItems: "center", color: "#64748b", textAlign: "center", padding: 16 }}>
+          Chưa có dữ liệu
+        </div>
+      </div>
+    );
+  }
   let acc = 0;
   const segments = data
     .map((x) => {
