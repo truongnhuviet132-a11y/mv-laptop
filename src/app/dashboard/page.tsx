@@ -4,30 +4,21 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getAppSettings } from "@/lib/appSettings";
 
-const rows = [
-  { model: "Dell 5300", supplier: "NCC A", sold: 2, buy: 6000000, repair: 420000, sale: 7350000, profit: 780000, profitDay: 39000, suggestion: "CÂN NHẮC" },
-  { model: "Dell 5300", supplier: "NCC B", sold: 2, buy: 6500000, repair: 180000, sale: 7600000, profit: 820000, profitDay: 41000, suggestion: "NÊN" },
-  { model: "HP 840 G7", supplier: "NCC C", sold: 3, buy: 5800000, repair: 200000, sale: 6900000, profit: 800000, profitDay: 36000, suggestion: "CÂN NHẮC" },
-];
+const rows: { model: string; supplier: string; sold: number; buy: number; repair: number; sale: number; profit: number; profitDay: number; suggestion: string }[] = [];
 
 const vnd = (n: number) => new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(n);
 
-// Demo KPI vốn/tiền theo yêu cầu chủ shop
 const kpi = {
-  monthlyProfit: 3200000,
-  soldCount: 4,
-  avgProfit: 800000,
-  stockCount: 12,
-  inventoryCapital: 54200000, // tổng vốn đang nằm trong hàng tồn
-  cashOnHand: 15400000, // tiền mặt/quỹ hiện tại
-  ownerTotalExpense: 63800000, // tổng chi đã chi cho chủ hàng (nhập + sửa + vận hành)
+  monthlyProfit: 0,
+  soldCount: 0,
+  avgProfit: 0,
+  stockCount: 0,
+  inventoryCapital: 0,
+  cashOnHand: 0,
+  ownerTotalExpense: 0,
 };
 
-const saleChannels = [
-  { name: "Khách cũ quay lại", profit: 1500000, color: "#16a34a" },
-  { name: "Facebook cá nhân", profit: 1050000, color: "#2563eb" },
-  { name: "FB quảng cáo", profit: 650000, color: "#f59e0b" },
-];
+const saleChannels: { name: string; profit: number; color: string }[] = [];
 
 export default function DashboardPage() {
   const [rangePreset, setRangePreset] = useState<"4W" | "8W" | "12W">("4W");
@@ -81,7 +72,7 @@ export default function DashboardPage() {
         <Kpi title="Tổng chi về chủ" value={vnd(kpi.ownerTotalExpense)} tone="amber" isMobile={isMobile} />
       </section>
       <div className="small-note" style={{ marginTop: -6 }}>
-        Ghi chú: Đang để chế độ tính demo theo mô hình “lãi chưa rút ra”, cần em nối số liệu DB thật thì em làm ngay.
+        Chưa có dữ liệu dashboard. Nhập hàng / bán hàng để bắt đầu.
       </div>
 
       <section style={box}>
@@ -109,6 +100,7 @@ export default function DashboardPage() {
                   <td style={td}><span className={`status-badge ${r.suggestion === "NÊN" ? "status-good" : "status-bad"}`}>{r.suggestion}</span></td>
                 </tr>
               ))}
+              {!rows.length ? <tr><td style={{ ...td, textAlign: "center", color: "#64748b" }} colSpan={9}>Chưa có dữ liệu hiệu quả model + nhà cung cấp</td></tr> : null}
             </tbody>
           </table>
         </div>
@@ -141,6 +133,7 @@ export default function DashboardPage() {
                 <div style={{ fontWeight: 800 }}>{vnd(c.profit)}</div>
               </div>
             ))}
+            {!saleChannels.length ? <div style={{ color: "#64748b" }}>Chưa có dữ liệu lợi nhuận theo kênh bán hàng.</div> : null}
             <div className="small-note">Kênh bán sẽ mở rộng thêm sau (TikTok, Website, Sàn TMĐT...)</div>
           </div>
         </div>
