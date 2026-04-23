@@ -1,0 +1,17 @@
+version: '3.9'
+services:
+  db:
+    image: postgres:16
+    container_name: mv_laptop_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mv_laptop
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - mv_laptop_pgdata:/var/lib/postgresql/data
+
+volumes:
+  mv_laptop_pgdata:

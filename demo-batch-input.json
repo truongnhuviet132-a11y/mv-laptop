@@ -1,0 +1,1 @@
+{"supplierName":"NCC Demo Batch","purchaseDate":"2026-04-22","batchNote":"Nhap lo bang ngang","lines":[{"model":"Dell 5300","quantity":2,"purchasePrice":6000000,"hasSerial":false,"note":"khong serial"},{"model":"Dell 430","quantity":2,"purchasePrice":5000000,"hasSerial":true,"serialsText":"DL430-A01\nDL430-A02","note":"co serial"}]}

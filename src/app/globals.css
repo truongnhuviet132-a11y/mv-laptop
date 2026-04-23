@@ -1,0 +1,197 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: #f3f4f6;
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.panel {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+}
+
+.input-clean {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fff;
+  min-height: 38px;
+}
+
+.input-clean:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.primary-btn {
+  border: 1px solid #1d4ed8;
+  background: #2563eb;
+  color: #fff;
+  border-radius: 8px;
+  padding: 10px 14px;
+  min-height: 44px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primary-btn:hover {
+  background: #1d4ed8;
+}
+
+.action-btn {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
+  border-radius: 6px;
+  padding: 6px 10px;
+  min-height: 40px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.action-btn:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.action-btn-danger {
+  border-color: #fecaca;
+  color: #b91c1c;
+  background: #fff;
+}
+
+.action-btn-danger:hover {
+  background: #fef2f2;
+}
+
+.app-nav-link {
+  text-decoration: none;
+  color: #374151;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.app-nav-link:hover {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.app-nav-link.active {
+  color: #1d4ed8;
+  background: #dbeafe;
+  box-shadow: inset 0 0 0 1px #bfdbfe;
+}
+
+.table-hover tbody tr {
+  transition: background 0.2s ease;
+}
+
+.table-hover tbody tr:hover {
+  background: #f8fafc;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+@media (max-width: 900px) {
+  body {
+    font-size: 15px;
+  }
+
+  .panel {
+    border-radius: 10px;
+  }
+
+  .input-clean,
+  .primary-btn,
+  .action-btn,
+  button {
+    min-height: 44px;
+  }
+
+  .app-nav-link {
+    padding: 9px 12px;
+    font-size: 14px;
+  }
+
+  .two-col {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.excel-grid {
+  border: 2px solid #64748b;
+}
+
+.excel-grid th,
+.excel-grid td {
+  border: 1px solid #94a3b8;
+}
+
+.excel-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #e2e8f0;
+}
+
+.excel-grid th:first-child,
+.excel-grid td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: #fff;
+}
+
+.excel-grid thead th:first-child {
+  z-index: 3;
+  background: #e2e8f0;
+}
+
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-block;
+}
+
+.status-good {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-warn {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-bad {
+  background: #fee2e2;
+  color: #991b1b;
+}

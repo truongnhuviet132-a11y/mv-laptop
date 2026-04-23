@@ -1,0 +1,423 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  OWNER
+  SALES
+  TECHNICIAN
+  ACCOUNTANT
+  VIEWER
+}
+
+enum ItemStatus {
+  NEW_IMPORTED
+  PENDING_CHECK
+  DEFECT_PENDING_DECISION
+  RETURNED_SUPPLIER
+  PROCESSING
+  PROCESSING_DONE_WAIT_SALE
+  READY_FOR_SALE
+  SOLD
+  UNDER_WARRANTY
+  WARRANTY_COMPLETED
+  PARTS_LIQUIDATION
+  CANCELED
+}
+
+enum MediaType {
+  IMAGE
+  DOCUMENT
+  VIDEO
+}
+
+enum PayerType {
+  SHOP
+  SUPPLIER
+  SHARED
+  CUSTOMER
+}
+
+enum WarrantyStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CANCELED
+}
+
+enum DebtPartyType {
+  CUSTOMER
+  SUPPLIER
+  COLLABORATOR
+}
+
+enum DebtType {
+  RECEIVABLE
+  PAYABLE
+}
+
+enum DebtStatus {
+  OPEN
+  PARTIAL
+  PAID
+  CANCELED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  MIXED
+  DEBT
+}
+
+enum AccountType {
+  CASH
+  BANK
+}
+
+enum TransactionType {
+  IN
+  OUT
+  TRANSFER
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  username     String    @unique
+  passwordHash String    @map("password_hash")
+  fullName     String    @map("full_name")
+  role         UserRole
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  salesOrders      SalesOrder[]
+  cashTransactions CashTransaction[]
+  auditLogs        AuditLog[]
+
+  @@map("users")
+}
+
+model Supplier {
+  id        Int      @id @default(autoincrement())
+  name      String
+  phone     String?
+  address   String?
+  note      String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  purchaseBatches PurchaseBatch[]
+  items           Item[]
+  purchaseReturns PurchaseReturn[]
+
+  @@map("suppliers")
+}
+
+model Collaborator {
+  id        Int      @id @default(autoincrement())
+  name      String
+  phone     String?
+  note      String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  salesOrders      SalesOrder[]
+  commissions      CollaboratorCommission[]
+
+  @@map("collaborators")
+}
+
+model Customer {
+  id        Int      @id @default(autoincrement())
+  name      String
+  phone     String?
+  address   String?
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  salesOrders SalesOrder[]
+
+  @@map("customers")
+}
+
+model ProductModel {
+  id             Int      @id @default(autoincrement())
+  brand          String
+  modelName      String   @map("model_name")
+  cpuDefault     String?  @map("cpu_default")
+  ramDefault     String?  @map("ram_default")
+  storageDefault String?  @map("storage_default")
+  gpuDefault     String?  @map("gpu_default")
+  screenSize     String?  @map("screen_size")
+  resolution     String?
+  imageUrl       String?  @map("image_url")
+  driverUrl      String?  @map("driver_url")
+  docUrl         String?  @map("doc_url")
+  note           String?
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  purchaseBatches PurchaseBatch[]
+  items           Item[]
+  media           ItemMedia[]
+
+  @@map("product_models")
+}
+
+model PurchaseBatch {
+  id                  Int      @id @default(autoincrement())
+  supplierId          Int      @map("supplier_id")
+  modelId             Int      @map("model_id")
+  purchaseDate        DateTime @map("purchase_date")
+  quantity            Int
+  totalPurchaseAmount Int      @map("total_purchase_amount")
+  shippingCost        Int      @default(0) @map("shipping_cost")
+  otherCost           Int      @default(0) @map("other_cost")
+  note                String?
+  status              String?
+
+  supplier Supplier         @relation(fields: [supplierId], references: [id])
+  model    ProductModel     @relation(fields: [modelId], references: [id])
+  items    Item[]
+  returns  PurchaseReturn[]
+
+  @@map("purchase_batches")
+}
+
+model Item {
+  id                   Int        @id @default(autoincrement())
+  internalCode         String     @unique @map("internal_code")
+  serialNumber         String?    @unique @map("serial_number")
+  manageBySerial       Boolean    @default(false) @map("manage_by_serial")
+  batchId              Int?       @map("batch_id")
+  supplierId           Int        @map("supplier_id")
+  modelId              Int        @map("model_id")
+  purchaseDate         DateTime   @map("purchase_date")
+  actualCpu            String?    @map("actual_cpu")
+  actualRam            String?    @map("actual_ram")
+  actualStorage        String?    @map("actual_storage")
+  actualGpu            String?    @map("actual_gpu")
+  batteryStatus        String?    @map("battery_status")
+  screenStatus         String?    @map("screen_status")
+  driveHealth          String?    @map("drive_health")
+  appearanceGrade      String?    @map("appearance_grade")
+  keyboardStatus       String?    @map("keyboard_status")
+  chargerIncluded      Boolean    @default(false) @map("charger_included")
+  initialConditionNote String?    @map("initial_condition_note")
+  currentStatus        ItemStatus @default(NEW_IMPORTED) @map("current_status")
+  purchasePrice        Int        @map("purchase_price")
+  allocatedCost        Int        @default(0) @map("allocated_cost")
+  note                 String?
+  soldAt               DateTime?  @map("sold_at")
+  createdAt            DateTime   @default(now()) @map("created_at")
+  updatedAt            DateTime   @updatedAt @map("updated_at")
+
+  batch         PurchaseBatch?         @relation(fields: [batchId], references: [id])
+  supplier      Supplier               @relation(fields: [supplierId], references: [id])
+  model         ProductModel           @relation(fields: [modelId], references: [id])
+  media         ItemMedia[]
+  repairs       ItemRepair[]
+  returns       PurchaseReturn[]
+  salesItems    SalesOrderItem[]
+  warrantyCases WarrantyCase[]
+
+  @@index([modelId, supplierId, purchaseDate])
+  @@map("items")
+}
+
+model ItemMedia {
+  id            Int       @id @default(autoincrement())
+  itemId        Int?      @map("item_id")
+  modelId       Int?      @map("model_id")
+  mediaType     MediaType @map("media_type")
+  filePathOrUrl String    @map("file_path_or_url")
+  note          String?
+
+  item  Item?        @relation(fields: [itemId], references: [id])
+  model ProductModel? @relation(fields: [modelId], references: [id])
+
+  @@map("item_media")
+}
+
+model ItemRepair {
+  id              Int      @id @default(autoincrement())
+  itemId          Int      @map("item_id")
+  repairDate      DateTime @map("repair_date")
+  repairType      String   @map("repair_type")
+  description     String?
+  partName        String?  @map("part_name")
+  partCost        Int      @default(0) @map("part_cost")
+  laborCost       Int      @default(0) @map("labor_cost")
+  externalCost    Int      @default(0) @map("external_cost")
+  totalCost       Int      @default(0) @map("total_cost")
+  includeInCost   Boolean  @default(true) @map("include_in_cost")
+  vendorOrPerson  String?  @map("vendor_or_person")
+  note            String?
+
+  item Item @relation(fields: [itemId], references: [id])
+
+  @@index([itemId, repairDate])
+  @@map("item_repairs")
+}
+
+model PurchaseReturn {
+  id           Int      @id @default(autoincrement())
+  supplierId   Int      @map("supplier_id")
+  batchId      Int?     @map("batch_id")
+  itemId       Int?     @map("item_id")
+  returnDate   DateTime @map("return_date")
+  reason       String
+  refundAmount Int      @default(0) @map("refund_amount")
+  note         String?
+
+  supplier Supplier       @relation(fields: [supplierId], references: [id])
+  batch    PurchaseBatch? @relation(fields: [batchId], references: [id])
+  item     Item?          @relation(fields: [itemId], references: [id])
+
+  @@map("purchase_returns")
+}
+
+model SalesOrder {
+  id                           Int           @id @default(autoincrement())
+  orderNo                      String        @unique @map("order_no")
+  saleDate                     DateTime      @map("sale_date")
+  customerId                   Int?          @map("customer_id")
+  subtotalAmount               Int           @default(0) @map("subtotal_amount")
+  discountAmount               Int           @default(0) @map("discount_amount")
+  finalAmount                  Int           @default(0) @map("final_amount")
+  paymentMethod                PaymentMethod @map("payment_method")
+  cashAmount                   Int           @default(0) @map("cash_amount")
+  bankAmount                   Int           @default(0) @map("bank_amount")
+  receivableAmount             Int           @default(0) @map("receivable_amount")
+  collaboratorId               Int?          @map("collaborator_id")
+  collaboratorCommissionAmount Int           @default(0) @map("collaborator_commission_amount")
+  note                         String?
+  createdBy                    Int           @map("created_by")
+
+  customer     Customer?                 @relation(fields: [customerId], references: [id])
+  collaborator Collaborator?             @relation(fields: [collaboratorId], references: [id])
+  creator      User                      @relation(fields: [createdBy], references: [id])
+  items        SalesOrderItem[]
+  warranties   WarrantyCase[]
+  commissions  CollaboratorCommission[]
+
+  @@map("sales_orders")
+}
+
+model SalesOrderItem {
+  id           Int    @id @default(autoincrement())
+  salesOrderId Int    @map("sales_order_id")
+  itemId       Int    @unique @map("item_id")
+  salePrice    Int    @map("sale_price")
+  warrantyMonths Int  @default(0) @map("warranty_months")
+  note         String?
+
+  salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id])
+  item       Item       @relation(fields: [itemId], references: [id])
+
+  @@map("sales_order_items")
+}
+
+model WarrantyCase {
+  id                  Int            @id @default(autoincrement())
+  itemId              Int            @map("item_id")
+  salesOrderId        Int?           @map("sales_order_id")
+  createdDate         DateTime       @map("created_date")
+  issueDescription    String         @map("issue_description")
+  resolution          String?
+  costAmount          Int            @default(0) @map("cost_amount")
+  payerType           PayerType      @map("payer_type")
+  supplierShareAmount Int            @default(0) @map("supplier_share_amount")
+  shopShareAmount     Int            @default(0) @map("shop_share_amount")
+  customerShareAmount Int            @default(0) @map("customer_share_amount")
+  status              WarrantyStatus @default(OPEN)
+  note                String?
+
+  item       Item       @relation(fields: [itemId], references: [id])
+  salesOrder SalesOrder? @relation(fields: [salesOrderId], references: [id])
+
+  @@index([itemId, createdDate])
+  @@map("warranty_cases")
+}
+
+model CollaboratorCommission {
+  id            Int        @id @default(autoincrement())
+  collaboratorId Int       @map("collaborator_id")
+  salesOrderId  Int        @map("sales_order_id")
+  amount        Int
+  paidAmount    Int        @default(0) @map("paid_amount")
+  dueAmount     Int        @default(0) @map("due_amount")
+  status        DebtStatus @default(OPEN)
+  note          String?
+
+  collaborator Collaborator @relation(fields: [collaboratorId], references: [id])
+  salesOrder   SalesOrder   @relation(fields: [salesOrderId], references: [id])
+
+  @@map("collaborator_commissions")
+}
+
+model CashTransaction {
+  id              Int             @id @default(autoincrement())
+  transactionDate DateTime        @map("transaction_date")
+  accountType     AccountType     @map("account_type")
+  transactionType TransactionType @map("transaction_type")
+  category        String
+  amount          Int
+  referenceType   String          @map("reference_type")
+  referenceId     Int?            @map("reference_id")
+  note            String?
+  createdBy       Int             @map("created_by")
+
+  creator User @relation(fields: [createdBy], references: [id])
+
+  @@map("cash_transactions")
+}
+
+model Debt {
+  id        Int          @id @default(autoincrement())
+  partyType DebtPartyType @map("party_type")
+  partyId   Int          @map("party_id")
+  debtType  DebtType     @map("debt_type")
+  amount    Int
+  paidAmount Int         @default(0) @map("paid_amount")
+  dueAmount Int          @default(0) @map("due_amount")
+  status    DebtStatus   @default(OPEN)
+  note      String?
+
+  payments DebtPayment[]
+
+  @@map("debts")
+}
+
+model DebtPayment {
+  id            Int           @id @default(autoincrement())
+  debtId         Int          @map("debt_id")
+  paymentDate    DateTime     @map("payment_date")
+  amount         Int
+  paymentMethod  PaymentMethod @map("payment_method")
+  note           String?
+
+  debt Debt @relation(fields: [debtId], references: [id])
+
+  @@map("debt_payments")
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @map("user_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   Int      @map("entity_id")
+  oldData    Json?    @map("old_data")
+  newData    Json?    @map("new_data")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
