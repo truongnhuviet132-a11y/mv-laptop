@@ -55,31 +55,60 @@ export async function GET(req: NextRequest) {
     ];
 
     // Production uses Supabase pooler with connection_limit=1, so run dashboard reads on one connection.
+    const soldWhere = {
+      salesOrder: { saleDate: { gte: start, lte: end } },
+      ...(modelFilter !== "ALL" ? { item: { modelId: Number(modelFilter) } } : {}),
+      ...(supplierFilter !== "ALL" ? { item: { supplierId: Number(supplierFilter) } } : {}),
+    };
+
+    const availableWhere = { currentStatus: { in: availableStatuses }, salesItems: { none: {} } };
+
     const [availableItems, soldItems, availableCount, allModels, allSuppliers, cashAgg, expenseAgg] = await prisma.$transaction([
       prisma.item.findMany({
-        where: { currentStatus: { in: availableStatuses }, salesItems: { none: {} } },
-        include: { model: true, supplier: true },
+        where: availableWhere,
+        select: {
+          id: true,
+          internalCode: true,
+          purchasePrice: true,
+          allocatedCost: true,
+          currentStatus: true,
+          model: { select: { brand: true, modelName: true } },
+          supplier: { select: { name: true } },
+        },
         orderBy: { createdAt: "desc" },
         take: 40,
       }),
       prisma.salesOrderItem.findMany({
-        where: {
-          salesOrder: { saleDate: { gte: start, lte: end } },
-          ...(modelFilter !== "ALL" ? { item: { modelId: Number(modelFilter) } } : {}),
-          ...(supplierFilter !== "ALL" ? { item: { supplierId: Number(supplierFilter) } } : {}),
-        },
-        include: {
-          item: { include: { model: true, supplier: true, repairs: { where: { includeInCost: true } }, warrantyCases: true } },
-          salesOrder: true,
+        where: soldWhere,
+        select: {
+          itemId: true,
+          salePrice: true,
+          note: true,
+          item: {
+            select: {
+              internalCode: true,
+              purchasePrice: true,
+              allocatedCost: true,
+              soldAt: true,
+              purchaseDate: true,
+              modelId: true,
+              supplierId: true,
+              model: { select: { brand: true, modelName: true } },
+              supplier: { select: { name: true } },
+              repairs: { where: { includeInCost: true }, select: { totalCost: true } },
+              warrantyCases: { select: { shopShareAmount: true } },
+            },
+          },
+          salesOrder: { select: { orderNo: true, saleDate: true, note: true, collaboratorCommissionAmount: true } },
         },
         orderBy: { id: "desc" },
       }),
-      prisma.item.count({ where: { currentStatus: { in: availableStatuses }, salesItems: { none: {} } } }),
-      prisma.productModel.findMany({ where: { isActive: true }, orderBy: [{ brand: "asc" }, { modelName: "asc" }] }),
-      prisma.supplier.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
+      prisma.item.count({ where: availableWhere }),
+      prisma.productModel.findMany({ where: { isActive: true }, orderBy: [{ brand: "asc" }, { modelName: "asc" }], select: { id: true, brand: true, modelName: true } }),
+      prisma.supplier.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
       prisma.cashTransaction.aggregate({ _sum: { amount: true }, where: { transactionType: "IN" } }),
       prisma.cashTransaction.aggregate({ _sum: { amount: true }, where: { transactionType: "OUT" } }),
-    ]);
+    ], { timeout: 20000 });
 
     const groupMap = new Map<string, GroupRow>();
     const channelMap = new Map<string, { name: string; profit: number }>();
