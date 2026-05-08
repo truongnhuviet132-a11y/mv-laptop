@@ -27,6 +27,8 @@ export default function SalesPage() {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
 
   const [loading, setLoading] = useState(false);
+  const [itemsLoading, setItemsLoading] = useState(true);
+  const [itemsError, setItemsError] = useState("");
   const [msg, setMsg] = useState("");
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
 
@@ -82,13 +84,30 @@ export default function SalesPage() {
     }
   }, []);
 
-  useEffect(() => {
-    const t = setTimeout(async () => {
-      const res = await fetch(`/api/sales/options?q=${encodeURIComponent(query)}`);
+  const loadSaleOptions = async (search = query, signal?: AbortSignal) => {
+    setItemsLoading(true);
+    setItemsError("");
+    try {
+      const res = await fetch(`/api/sales/options?q=${encodeURIComponent(search)}`, { signal });
       const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Không tải được danh sách máy bán");
       setItems(data.items || []);
-    }, 220);
-    return () => clearTimeout(t);
+    } catch (e: unknown) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
+      setItems([]);
+      setItemsError(e instanceof Error ? e.message : "Không tải được danh sách máy bán");
+    } finally {
+      if (!signal?.aborted) setItemsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => loadSaleOptions(query, ctrl.signal), query ? 220 : 0);
+    return () => {
+      ctrl.abort();
+      clearTimeout(t);
+    };
   }, [query]);
 
   const disabled = !selected;
@@ -163,9 +182,7 @@ export default function SalesPage() {
       }
       setNote("");
 
-      const refetch = await fetch(`/api/sales/options?q=${encodeURIComponent(query)}`);
-      const d2 = await refetch.json();
-      setItems(d2.items || []);
+      await loadSaleOptions(query);
     } catch (e: any) {
       setMsg(`❌ ${e?.message || "Có lỗi"}`);
     } finally {
@@ -176,11 +193,18 @@ export default function SalesPage() {
   return (
     <div style={{ display: "grid", gap: 12 }}>
       <section className="panel" style={{ padding: 14 }}>
-        <label style={{ display: "grid", gap: 6, fontWeight: 700 }}>
-          Tìm máy để bán (mã / serial / model)
-          <input className="input-clean" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="VD: MV-..., serial..., Latitude..." />
-        </label>
-        <div style={{ marginTop: 10, overflow: "auto", maxHeight: 280 }}>
+        <div style={{ display: "grid", gap: 8 }}>
+          <label style={{ display: "grid", gap: 6, fontWeight: 700 }}>
+            Tìm máy để bán (mã / serial / model)
+            <input className="input-clean" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="VD: MV-..., serial..., Latitude..." />
+          </label>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", color: "#64748b", fontSize: 13 }}>
+            <span>{itemsLoading ? "Đang tải danh sách máy..." : `Có ${items.length} máy có thể chọn bán`}</span>
+            <button type="button" className="action-btn" onClick={() => loadSaleOptions(query)} disabled={itemsLoading}>{itemsLoading ? "Đang tải" : "Tải lại"}</button>
+            {itemsError ? <span style={{ color: "#b91c1c", fontWeight: 700 }}>⚠️ {itemsError}</span> : null}
+          </div>
+        </div>
+        <div style={{ marginTop: 10, overflow: "auto", maxHeight: 420 }}>
           <table className="excel-grid table-hover" style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead><tr>{["Mã máy", "Serial", "Model", "NCC", "Giá nhập", "Trạng thái", ""].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
             <tbody>
@@ -190,7 +214,7 @@ export default function SalesPage() {
                   <td style={td}>{money(x.purchasePrice)}</td><td style={td}>{x.currentStatus}</td><td style={td}><button className="primary-btn" onClick={() => setSelected(x)}>Chọn</button></td>
                 </tr>
               ))}
-              {!items.length && <tr><td style={{ ...td, textAlign: "center", color: "#64748b" }} colSpan={7}>Không có máy phù hợp</td></tr>}
+              {!items.length && <tr><td style={{ ...td, textAlign: "center", color: "#64748b" }} colSpan={7}>{itemsLoading ? "Đang tải danh sách máy..." : itemsError ? "Không tải được danh sách máy, bấm Tải lại" : "Không có máy phù hợp"}</td></tr>}
             </tbody>
           </table>
         </div>
