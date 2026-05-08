@@ -88,22 +88,36 @@ body {
 
 .app-nav-link {
   text-decoration: none;
-  color: #374151;
+  color: #075985;
   padding: 6px 10px;
-  border-radius: 8px;
-  font-weight: 600;
+  border-radius: 10px;
+  font-weight: 700;
+  border: 1px solid transparent;
   transition: all 0.2s ease;
 }
 
 .app-nav-link:hover {
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: #e0f2fe;
+  color: #0369a1;
+  border-color: #7dd3fc;
 }
 
 .app-nav-link.active {
-  color: #1d4ed8;
-  background: #dbeafe;
-  box-shadow: inset 0 0 0 1px #bfdbfe;
+  color: #ffffff;
+  background: linear-gradient(135deg, #0284c7, #2563eb);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, .22);
+}
+
+.selected-goods-panel {
+  border-color: #7dd3fc;
+  background: linear-gradient(180deg, #f0f9ff, #ffffff);
+  box-shadow: 0 10px 24px rgba(2, 132, 199, .08);
+}
+
+.selected-goods-panel thead th {
+  background: #bae6fd !important;
+  color: #0c4a6e;
+  border-color: #7dd3fc !important;
 }
 
 .table-hover tbody tr {

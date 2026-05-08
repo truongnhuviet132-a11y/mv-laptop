@@ -29,9 +29,9 @@ export default function AppHeader() {
   if (pathname === "/login") return null;
 
   return (
-    <header style={{ borderBottom: "1px solid #e5e7eb", background: "#fff", position: "sticky", top: 0, zIndex: 10 }}>
+    <header style={{ borderBottom: "1px solid #bae6fd", background: "linear-gradient(90deg, #f0f9ff, #ffffff)", position: "sticky", top: 0, zIndex: 10, boxShadow: "0 4px 16px rgba(2, 132, 199, .06)" }}>
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "10px 16px", display: "flex", gap: 16, alignItems: "center" }}>
-        <Link href="/dashboard" style={{ fontWeight: 800, textDecoration: "none", color: "#111827" }}>MV</Link>
+        <Link href="/dashboard" style={{ fontWeight: 900, textDecoration: "none", color: "#0369a1", background: "#e0f2fe", border: "1px solid #7dd3fc", borderRadius: 12, padding: "8px 10px" }}>MV</Link>
         <nav style={{ display: "flex", gap: 8, flexWrap: isMobile ? "nowrap" : "wrap", overflowX: isMobile ? "auto" : "visible", WebkitOverflowScrolling: "touch", paddingBottom: isMobile ? 4 : 0 }}>
           {nav.map((item) => {
             const active = item.href === "/sales" ? pathname.startsWith("/sales") || pathname.startsWith("/dashboard/sales") : pathname.startsWith(item.href);
