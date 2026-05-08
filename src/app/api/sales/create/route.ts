@@ -75,6 +75,7 @@ export async function POST(req: Request) {
 
     const allowedStatuses = new Set<ItemStatus>([
       ItemStatus.NEW_IMPORTED,
+      ItemStatus.PENDING_CHECK,
       ItemStatus.PROCESSING_DONE_WAIT_SALE,
       ItemStatus.READY_FOR_SALE,
     ]);
