@@ -78,27 +78,29 @@ export default function SalesPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const loadSaleOptions = async (search = query, signal?: AbortSignal) => {
+  const loadSaleOptions = async (search = query) => {
     setItemsLoading(true);
     setItemsError("");
     try {
-      const res = await fetch(`/api/sales/options?q=${encodeURIComponent(search)}`, { signal });
+      const res = await fetch(`/api/sales/options?q=${encodeURIComponent(search)}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Không tải được danh sách máy bán");
       setItems(data.items || []);
     } catch (e: unknown) {
-      if (e instanceof DOMException && e.name === "AbortError") return;
       setItems([]);
       setItemsError(e instanceof Error ? e.message : "Không tải được danh sách máy bán");
     } finally {
-      if (!signal?.aborted) setItemsLoading(false);
+      setItemsLoading(false);
     }
   };
 
   useEffect(() => {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => loadSaleOptions(query, ctrl.signal), query ? 220 : 0);
-    return () => { ctrl.abort(); clearTimeout(t); };
+    let active = true;
+    const t = setTimeout(async () => {
+      if (!active) return;
+      await loadSaleOptions(query);
+    }, query ? 220 : 0);
+    return () => { active = false; clearTimeout(t); };
   }, [query]);
 
   const filteredItems = useMemo(() => items.filter((item) => !lines.some((line) => line.id === item.id)), [items, lines]);
