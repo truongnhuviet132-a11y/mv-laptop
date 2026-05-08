@@ -54,32 +54,32 @@ export async function GET(req: NextRequest) {
       ItemStatus.READY_FOR_SALE,
     ];
 
-    // Production uses Supabase pooler with connection_limit=1, so keep DB reads sequential.
-    const availableItems = await prisma.item.findMany({
-      where: { currentStatus: { in: availableStatuses }, salesItems: { none: {} } },
-      include: { model: true, supplier: true },
-      orderBy: { createdAt: "desc" },
-      take: 40,
-    });
-
-    const soldItems = await prisma.salesOrderItem.findMany({
-      where: {
-        salesOrder: { saleDate: { gte: start, lte: end } },
-        ...(modelFilter !== "ALL" ? { item: { modelId: Number(modelFilter) } } : {}),
-        ...(supplierFilter !== "ALL" ? { item: { supplierId: Number(supplierFilter) } } : {}),
-      },
-      include: {
-        item: { include: { model: true, supplier: true, repairs: { where: { includeInCost: true } }, warrantyCases: true } },
-        salesOrder: true,
-      },
-      orderBy: { id: "desc" },
-    });
-
-    const availableCount = await prisma.item.count({ where: { currentStatus: { in: availableStatuses }, salesItems: { none: {} } } });
-    const allModels = await prisma.productModel.findMany({ where: { isActive: true }, orderBy: [{ brand: "asc" }, { modelName: "asc" }] });
-    const allSuppliers = await prisma.supplier.findMany({ where: { isActive: true }, orderBy: { name: "asc" } });
-    const cashAgg = await prisma.cashTransaction.aggregate({ _sum: { amount: true }, where: { transactionType: "IN" } });
-    const expenseAgg = await prisma.cashTransaction.aggregate({ _sum: { amount: true }, where: { transactionType: "OUT" } });
+    // Production uses Supabase pooler with connection_limit=1, so run dashboard reads on one connection.
+    const [availableItems, soldItems, availableCount, allModels, allSuppliers, cashAgg, expenseAgg] = await prisma.$transaction([
+      prisma.item.findMany({
+        where: { currentStatus: { in: availableStatuses }, salesItems: { none: {} } },
+        include: { model: true, supplier: true },
+        orderBy: { createdAt: "desc" },
+        take: 40,
+      }),
+      prisma.salesOrderItem.findMany({
+        where: {
+          salesOrder: { saleDate: { gte: start, lte: end } },
+          ...(modelFilter !== "ALL" ? { item: { modelId: Number(modelFilter) } } : {}),
+          ...(supplierFilter !== "ALL" ? { item: { supplierId: Number(supplierFilter) } } : {}),
+        },
+        include: {
+          item: { include: { model: true, supplier: true, repairs: { where: { includeInCost: true } }, warrantyCases: true } },
+          salesOrder: true,
+        },
+        orderBy: { id: "desc" },
+      }),
+      prisma.item.count({ where: { currentStatus: { in: availableStatuses }, salesItems: { none: {} } } }),
+      prisma.productModel.findMany({ where: { isActive: true }, orderBy: [{ brand: "asc" }, { modelName: "asc" }] }),
+      prisma.supplier.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
+      prisma.cashTransaction.aggregate({ _sum: { amount: true }, where: { transactionType: "IN" } }),
+      prisma.cashTransaction.aggregate({ _sum: { amount: true }, where: { transactionType: "OUT" } }),
+    ]);
 
     const groupMap = new Map<string, GroupRow>();
     const channelMap = new Map<string, { name: string; profit: number }>();
