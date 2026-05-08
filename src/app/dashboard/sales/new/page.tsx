@@ -16,10 +16,10 @@ export default function NewSalePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<SaleOption[]>([]);
+  const [selectedItemIds, setSelectedItemIds] = useState<number[]>([]);
+  const [itemPrices, setItemPrices] = useState<Record<number, number>>({});
 
   const [form, setForm] = useState({
-    itemId: "",
-    salePrice: 0,
     paymentMethod: "CASH",
     customerName: "",
     customerPhone: "",
@@ -35,20 +35,41 @@ export default function NewSalePage() {
       .catch(() => setItems([]));
   }, []);
 
-  const selectedItem = useMemo(
-    () => items.find((x) => String(x.id) === form.itemId),
-    [items, form.itemId]
+  const selectedItems = useMemo(
+    () => items.filter((x) => selectedItemIds.includes(x.id)),
+    [items, selectedItemIds]
   );
+
+  const totalSalePrice = useMemo(
+    () => selectedItemIds.reduce((sum, id) => sum + Number(itemPrices[id] || 0), 0),
+    [selectedItemIds, itemPrices]
+  );
+
+  const toggleItem = (item: SaleOption) => {
+    setSelectedItemIds((prev) => {
+      if (prev.includes(item.id)) {
+        return prev.filter((id) => id !== item.id);
+      }
+      return [...prev, item.id];
+    });
+
+    setItemPrices((prev) => ({
+      ...prev,
+      [item.id]: prev[item.id] ?? item.purchasePrice,
+    }));
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!form.itemId) {
-      alert("❌ Vui lòng chọn máy cần bán.");
+    if (selectedItemIds.length === 0) {
+      alert("❌ Vui lòng tick chọn ít nhất 1 máy cần bán.");
       return;
     }
-    if (!form.salePrice || form.salePrice <= 0) {
-      alert("❌ Giá bán phải lớn hơn 0.");
+
+    const invalidItem = selectedItemIds.find((id) => !itemPrices[id] || itemPrices[id] <= 0);
+    if (invalidItem) {
+      alert("❌ Giá bán của từng máy phải lớn hơn 0.");
       return;
     }
 
@@ -59,8 +80,10 @@ export default function NewSalePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
-          itemId: Number(form.itemId),
-          salePrice: Number(form.salePrice),
+          items: selectedItemIds.map((id) => ({
+            itemId: id,
+            salePrice: Number(itemPrices[id]),
+          })),
           collaboratorCommissionAmount: Number(form.collaboratorCommissionAmount || 0),
         }),
       });
@@ -68,7 +91,7 @@ export default function NewSalePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Tạo đơn thất bại");
 
-      alert(`✅ Đã tạo đơn ${data.orderNo}`);
+      alert(`✅ Đã tạo đơn ${data.orderNo} với ${data.itemCount || selectedItemIds.length} máy`);
       router.push("/dashboard");
       router.refresh();
     } catch (err: unknown) {
@@ -89,38 +112,70 @@ export default function NewSalePage() {
   };
 
   return (
-    <div style={{ maxWidth: 760, margin: "24px auto", padding: 16, fontFamily: "Arial, sans-serif" }}>
+    <div style={{ maxWidth: 900, margin: "24px auto", padding: 16, fontFamily: "Arial, sans-serif" }}>
       <h1 style={{ marginBottom: 8 }}>Tạo đơn bán hàng</h1>
-      <p style={{ color: "#666", marginBottom: 16 }}>Chọn máy có thể bán và lưu đơn nhanh.</p>
+      <p style={{ color: "#666", marginBottom: 16 }}>Tick chọn một hoặc nhiều máy cho cùng một khách hàng.</p>
 
       <form onSubmit={onSubmit} style={{ display: "grid", gap: 14, border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
-        <label>
-          Chọn máy cần bán *
-          <select
-            style={inputStyle}
-            value={form.itemId}
-            onChange={(e) => setForm((p) => ({ ...p, itemId: e.target.value }))}
-            required
-          >
-            <option value="">-- Chọn máy --</option>
-            {items.map((i) => (
-              <option key={i.id} value={i.id}>
-                {i.internalCode} | {i.model} | {i.supplier}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 8 }}>
+            <b>Chọn máy cần bán *</b>
+            <span style={{ color: "#475569", fontSize: 14 }}>
+              Đã chọn: <b>{selectedItemIds.length}</b> máy | Tổng: <b>{totalSalePrice.toLocaleString("vi-VN")} đ</b>
+            </span>
+          </div>
 
-        {selectedItem && (
+          <div style={{ display: "grid", gap: 8, maxHeight: 420, overflow: "auto", border: "1px solid #e5e7eb", borderRadius: 10, padding: 8 }}>
+            {items.length === 0 && <div style={{ color: "#64748b", padding: 10 }}>Chưa có máy nào ở trạng thái có thể bán.</div>}
+            {items.map((item) => {
+              const checked = selectedItemIds.includes(item.id);
+              return (
+                <div
+                  key={item.id}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "32px 1fr 180px",
+                    gap: 10,
+                    alignItems: "center",
+                    padding: 10,
+                    border: checked ? "1px solid #2563eb" : "1px solid #e2e8f0",
+                    borderRadius: 10,
+                    background: checked ? "#eff6ff" : "#fff",
+                  }}
+                >
+                  <input
+                    aria-label={`Chọn máy ${item.internalCode}`}
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleItem(item)}
+                    style={{ width: 20, height: 20, cursor: "pointer" }}
+                  />
+                  <label onClick={() => toggleItem(item)} style={{ cursor: "pointer" }}>
+                    <div style={{ fontWeight: 700 }}>{item.internalCode} | {item.model}</div>
+                    <div style={{ color: "#64748b", fontSize: 13 }}>
+                      NCC: {item.supplier} | Giá nhập: {item.purchasePrice.toLocaleString("vi-VN")} đ | Trạng thái: {item.currentStatus}
+                    </div>
+                  </label>
+                  <input
+                    style={inputStyle}
+                    type="number"
+                    min={1}
+                    disabled={!checked}
+                    value={itemPrices[item.id] || ""}
+                    placeholder="Giá bán"
+                    onChange={(e) => setItemPrices((p) => ({ ...p, [item.id]: Number(e.target.value) }))}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {selectedItems.length > 0 && (
           <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: 10, fontSize: 14 }}>
-            Giá nhập: <b>{selectedItem.purchasePrice.toLocaleString("vi-VN")} đ</b> | Trạng thái: <b>{selectedItem.currentStatus}</b>
+            Đơn này sẽ bán <b>{selectedItems.length}</b> máy cho cùng một khách hàng. Mỗi máy sẽ được lưu thành một dòng trong đơn bán hàng.
           </div>
         )}
-
-        <label>
-          Giá bán *
-          <input style={inputStyle} type="number" min={1} value={form.salePrice} onChange={(e) => setForm((p) => ({ ...p, salePrice: Number(e.target.value) }))} required />
-        </label>
 
         <label>
           Phương thức thanh toán *
