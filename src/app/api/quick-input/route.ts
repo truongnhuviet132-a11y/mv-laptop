@@ -1,5 +1,5 @@
 ﻿import { NextResponse } from "next/server";
-import { ItemStatus } from "@prisma/client";
+import { ItemStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -19,6 +19,43 @@ function splitModelLabel(modelLabel: string) {
   const parts = t.split(" ").filter(Boolean);
   if (parts.length === 1) return { brand: "Laptop", modelName: parts[0] };
   return { brand: parts[0], modelName: parts.slice(1).join(" ") };
+}
+
+function normalizeSerial(serial: string) {
+  return serial.trim();
+}
+
+function findDuplicateSerials(serials: string[]) {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+
+  for (const serial of serials) {
+    const key = serial.toLowerCase();
+    if (seen.has(key)) duplicates.add(serial);
+    seen.add(key);
+  }
+
+  return Array.from(duplicates);
+}
+
+function duplicateSerialMessage(duplicates: string[], source: "batch" | "database") {
+  const shown = duplicates.slice(0, 12).join(", ");
+  const more = duplicates.length > 12 ? ` và ${duplicates.length - 12} serial khác` : "";
+  return source === "batch"
+    ? `Serial bị trùng trong lô đang nhập: ${shown}${more}. Vui lòng kiểm tra lại trước khi lưu.`
+    : `Serial đã tồn tại trong hệ thống: ${shown}${more}. Vui lòng kiểm tra lại, không nhập trùng máy.`;
+}
+
+async function findExistingSerials(serials: string[]) {
+  const uniqueSerials = Array.from(new Set(serials.map(normalizeSerial).filter(Boolean)));
+  if (!uniqueSerials.length) return [];
+
+  const rows = await prisma.item.findMany({
+    where: { serialNumber: { in: uniqueSerials } },
+    select: { serialNumber: true },
+  });
+
+  return rows.map((row) => row.serialNumber).filter((serial): serial is string => Boolean(serial));
 }
 
 async function findOrCreateSupplier(name: string) {
@@ -68,6 +105,23 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Ngày nhập không hợp lệ." }, { status: 400 });
       }
 
+      const allSerials = lines.flatMap((line) => {
+        if (!line?.hasSerial) return [];
+        return String(line?.serialsText || "")
+          .split(/\r?\n|,|;/)
+          .map(normalizeSerial)
+          .filter(Boolean);
+      });
+      const duplicateInBatch = findDuplicateSerials(allSerials);
+      if (duplicateInBatch.length) {
+        return NextResponse.json({ error: duplicateSerialMessage(duplicateInBatch, "batch") }, { status: 400 });
+      }
+
+      const duplicateInDb = await findExistingSerials(allSerials);
+      if (duplicateInDb.length) {
+        return NextResponse.json({ error: duplicateSerialMessage(duplicateInDb, "database") }, { status: 400 });
+      }
+
       const createdIds: number[] = [];
       const lineSummaries: Array<{ model: string; count: number }> = [];
 
@@ -86,7 +140,7 @@ export async function POST(req: Request) {
         const serialList = hasSerial
           ? String(line?.serialsText || "")
               .split(/\r?\n|,|;/)
-              .map((x) => x.trim())
+              .map(normalizeSerial)
               .filter(Boolean)
           : [];
 
@@ -202,7 +256,16 @@ export async function POST(req: Request) {
       createdItemCount: createdItems.length,
       itemIds: createdItems,
     });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Lỗi server" }, { status: 500 });
+  } catch (e: unknown) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      const target = Array.isArray(e.meta?.target) ? e.meta.target.join(", ") : String(e.meta?.target || "dữ liệu duy nhất");
+      if (target.includes("serial_number")) {
+        return NextResponse.json({ error: "Serial đã tồn tại trong hệ thống. Vui lòng kiểm tra lại, không nhập trùng máy." }, { status: 400 });
+      }
+      return NextResponse.json({ error: `Dữ liệu bị trùng (${target}). Vui lòng kiểm tra lại trước khi lưu.` }, { status: 400 });
+    }
+
+    const message = e instanceof Error ? e.message : "Lỗi server";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
