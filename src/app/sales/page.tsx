@@ -240,6 +240,6 @@ const lab: React.CSSProperties = { display: "grid", gap: 6, fontWeight: 700, col
 const th: React.CSSProperties = { textAlign: "left", padding: "10px 8px", background: "#e5e7eb", fontWeight: 800, border: "1px solid #cbd5e1", whiteSpace: "nowrap" };
 const td: React.CSSProperties = { padding: "9px 8px", border: "1px solid #e2e8f0", verticalAlign: "middle" };
 const pickerBox: React.CSSProperties = { position: "absolute", top: 82, left: 0, right: 0, zIndex: 20, background: "#fff", border: "1px solid #93c5fd", boxShadow: "0 20px 45px rgba(15, 23, 42, .18)", borderRadius: 12, padding: 12 };
-const customerSuggestBox: React.CSSProperties = { position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 25, display: "grid", gap: 4, background: "#fff", border: "1px solid #93c5fd", boxShadow: "0 18px 35px rgba(15, 23, 42, .16)", borderRadius: 10, padding: 8, maxHeight: 240, overflow: "auto" };
+const customerSuggestBox: React.CSSProperties = { marginTop: 4, display: "grid", gap: 4, background: "#fff", border: "1px solid #93c5fd", boxShadow: "0 10px 22px rgba(15, 23, 42, .10)", borderRadius: 10, padding: 8, maxHeight: 180, overflow: "auto" };
 const customerSuggestItem: React.CSSProperties = { display: "grid", gap: 3, textAlign: "left", border: 0, background: "#fff", borderRadius: 8, padding: "8px 10px", cursor: "pointer", font: "inherit" };
 const customerSuggestEmpty: React.CSSProperties = { padding: "8px 10px", color: "#64748b", fontSize: 13 };
