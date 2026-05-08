@@ -6,6 +6,7 @@ import { AppSettings, DEFAULT_SETTINGS, getAppSettings } from "@/lib/appSettings
 type SaleOption = { id: number; internalCode: string; serialNumber?: string | null; model: string; supplier: string; purchasePrice: number; currentStatus: string };
 type SaleLine = SaleOption & { salePrice: number; warrantyMonths: number; note?: string };
 type Collaborator = { id: number; name: string };
+type CustomerSuggestion = { id: number; name: string; phone?: string | null; address?: string | null };
 
 const CUSTOM_CHANNEL = "__CUSTOM_CHANNEL__";
 const money = (n: number) => `${new Intl.NumberFormat("vi-VN").format(n || 0)} đ`;
@@ -28,6 +29,9 @@ export default function SalesPage() {
   const [amountCollected, setAmountCollected] = useState(0);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerSuggestions, setCustomerSuggestions] = useState<CustomerSuggestion[]>([]);
+  const [customerSuggestOpen, setCustomerSuggestOpen] = useState(false);
+  const [customerSuggestLoading, setCustomerSuggestLoading] = useState(false);
   const [saleChannel, setSaleChannel] = useState<string>("");
   const [customChannel, setCustomChannel] = useState("");
   const [saleChannels, setSaleChannels] = useState<string[]>(DEFAULT_SETTINGS.saleChannels);
@@ -103,6 +107,36 @@ export default function SalesPage() {
     return () => { active = false; clearTimeout(t); };
   }, [query]);
 
+  useEffect(() => {
+    const search = customerPhone.trim() || customerName.trim();
+    let active = true;
+    const t = setTimeout(async () => {
+      if (search.length < 2) {
+        setCustomerSuggestions([]);
+        setCustomerSuggestLoading(false);
+        return;
+      }
+      setCustomerSuggestLoading(true);
+      try {
+        const res = await fetch(`/api/sales/customers?q=${encodeURIComponent(search)}`);
+        const data = await res.json();
+        if (!active) return;
+        setCustomerSuggestions(res.ok ? data.customers || [] : []);
+      } catch {
+        if (active) setCustomerSuggestions([]);
+      } finally {
+        if (active) setCustomerSuggestLoading(false);
+      }
+    }, 220);
+    return () => { active = false; clearTimeout(t); };
+  }, [customerName, customerPhone]);
+
+  const selectCustomer = (customer: CustomerSuggestion) => {
+    setCustomerName(customer.name || "");
+    setCustomerPhone(customer.phone || "");
+    setCustomerSuggestOpen(false);
+  };
+
   const filteredItems = useMemo(() => items.filter((item) => !lines.some((line) => line.id === item.id)), [items, lines]);
   const subtotal = lines.reduce((sum, line) => sum + Number(line.salePrice || 0), 0);
   const extraCost = (freeShip ? freeShipCost : 0) + (giftAccessory ? giftAccessoryCost : 0) + otherExtraCost + commission;
@@ -171,7 +205,7 @@ export default function SalesPage() {
         </div> : null}
       </div>
 
-      <div className="panel" style={{ padding: 12, background: "#f8fafc" }}><div style={{ fontWeight: 900, marginBottom: 8 }}>Khách hàng & kênh</div><div style={{ display: "grid", gap: 8 }}><input className="input-clean" placeholder="Tên khách hàng" value={customerName} onChange={(e) => setCustomerName(e.target.value)} /><input className="input-clean" placeholder="Số điện thoại" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} /><select className="input-clean" value={saleChannel} onChange={(e) => setSaleChannel(e.target.value)}><option value="">Chọn kênh bán</option>{saleChannels.map((c) => <option key={c} value={c}>{c}</option>)}<option value={CUSTOM_CHANNEL}>Khác, thêm mới</option></select>{saleChannel === CUSTOM_CHANNEL ? <input className="input-clean" placeholder="Tên kênh mới" value={customChannel} onChange={(e) => setCustomChannel(e.target.value)} /> : null}<input className="input-clean" type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} /></div></div>
+      <div className="panel" style={{ padding: 12, background: "#f8fafc", position: "relative" }}><div style={{ fontWeight: 900, marginBottom: 8 }}>Khách hàng & kênh</div><div style={{ display: "grid", gap: 8 }}><input className="input-clean" placeholder="Tên khách hàng" value={customerName} onFocus={() => setCustomerSuggestOpen(true)} onChange={(e) => { setCustomerName(e.target.value); setCustomerSuggestOpen(true); }} /><input className="input-clean" placeholder="Số điện thoại" value={customerPhone} onFocus={() => setCustomerSuggestOpen(true)} onChange={(e) => { setCustomerPhone(e.target.value); setCustomerSuggestOpen(true); }} />{customerSuggestOpen && (customerName.trim().length >= 2 || customerPhone.trim().length >= 2) ? <div style={customerSuggestBox}>{customerSuggestLoading ? <div style={customerSuggestEmpty}>Đang tìm khách hàng...</div> : customerSuggestions.length ? customerSuggestions.map((c) => <button key={c.id} type="button" style={customerSuggestItem} onMouseDown={(e) => { e.preventDefault(); selectCustomer(c); }}><b>{c.name}</b><span style={{ color: "#64748b" }}>{c.phone || "Chưa có SĐT"}{c.address ? ` • ${c.address}` : ""}</span></button>) : <div style={customerSuggestEmpty}>Không thấy khách cũ phù hợp</div>}</div> : null}<select className="input-clean" value={saleChannel} onChange={(e) => setSaleChannel(e.target.value)}><option value="">Chọn kênh bán</option>{saleChannels.map((c) => <option key={c} value={c}>{c}</option>)}<option value={CUSTOM_CHANNEL}>Khác, thêm mới</option></select>{saleChannel === CUSTOM_CHANNEL ? <input className="input-clean" placeholder="Tên kênh mới" value={customChannel} onChange={(e) => setCustomChannel(e.target.value)} /> : null}<input className="input-clean" type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} /></div></div>
       <div className="panel" style={{ padding: 12, background: "#f8fafc" }}><div style={{ fontWeight: 900, marginBottom: 8 }}>Thanh toán</div><div style={{ display: "grid", gap: 8 }}><select className="input-clean" value={paymentType} onChange={(e) => setPaymentType(e.target.value as "CASH" | "BANK_TRANSFER" | "COD")}><option value="CASH">Tiền mặt</option><option value="BANK_TRANSFER">Chuyển khoản</option><option value="COD">COD</option></select><input className="input-clean" type="number" placeholder="Đã thu" value={amountCollected} onChange={(e) => setAmountCollected(Number(e.target.value))} /><input className="input-clean" type="number" placeholder="Hoa hồng" value={commission} onChange={(e) => setCommission(Number(e.target.value))} /><select className="input-clean" disabled={commission <= 0} value={collaboratorName} onChange={(e) => setCollaboratorName(e.target.value)}><option value="">{commission > 0 ? "Chọn CTV" : "Không áp dụng CTV"}</option>{collaborators.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}</select></div></div>
     </section>
 
@@ -193,3 +227,6 @@ const lab: React.CSSProperties = { display: "grid", gap: 6, fontWeight: 700, col
 const th: React.CSSProperties = { textAlign: "left", padding: "10px 8px", background: "#e5e7eb", fontWeight: 800, border: "1px solid #cbd5e1", whiteSpace: "nowrap" };
 const td: React.CSSProperties = { padding: "9px 8px", border: "1px solid #e2e8f0", verticalAlign: "middle" };
 const pickerBox: React.CSSProperties = { position: "absolute", top: 82, left: 0, right: 0, zIndex: 20, background: "#fff", border: "1px solid #93c5fd", boxShadow: "0 20px 45px rgba(15, 23, 42, .18)", borderRadius: 12, padding: 12 };
+const customerSuggestBox: React.CSSProperties = { position: "absolute", top: 104, left: 12, right: 12, zIndex: 25, display: "grid", gap: 4, background: "#fff", border: "1px solid #93c5fd", boxShadow: "0 18px 35px rgba(15, 23, 42, .16)", borderRadius: 10, padding: 8, maxHeight: 240, overflow: "auto" };
+const customerSuggestItem: React.CSSProperties = { display: "grid", gap: 3, textAlign: "left", border: 0, background: "#fff", borderRadius: 8, padding: "8px 10px", cursor: "pointer", font: "inherit" };
+const customerSuggestEmpty: React.CSSProperties = { padding: "8px 10px", color: "#64748b", fontSize: 13 };
