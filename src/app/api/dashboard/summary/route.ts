@@ -108,7 +108,7 @@ export async function GET(req: NextRequest) {
       prisma.supplier.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
       prisma.cashTransaction.aggregate({ _sum: { amount: true }, where: { transactionType: "IN" } }),
       prisma.cashTransaction.aggregate({ _sum: { amount: true }, where: { transactionType: "OUT" } }),
-    ], { timeout: 20000 });
+    ]);
 
     const groupMap = new Map<string, GroupRow>();
     const channelMap = new Map<string, { name: string; profit: number }>();
