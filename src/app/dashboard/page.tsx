@@ -46,19 +46,27 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    const ctrl = new AbortController();
-    setLoading(true);
-    setError("");
-    const q = new URLSearchParams({ range: rangePreset, model, supplier });
-    fetch(`/api/dashboard/summary?${q.toString()}`, { signal: ctrl.signal })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.error) setError(data.error);
+    let active = true;
+
+    const loadDashboard = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const q = new URLSearchParams({ range: rangePreset, model, supplier, t: String(Date.now()) });
+        const res = await fetch(`/api/dashboard/summary?${q.toString()}`, { cache: "no-store" });
+        const data = await res.json();
+        if (!active) return;
+        if (!res.ok || data.error) setError(data.error || "Không tải được dữ liệu dashboard");
         setSummary({ ...emptySummary, ...data, kpi: { ...emptySummary.kpi, ...(data.kpi || {}) }, filters: { ...emptySummary.filters, ...(data.filters || {}) }, costStructure: { ...emptySummary.costStructure, ...(data.costStructure || {}) } });
-      })
-      .catch((e) => { if (e.name !== "AbortError") setError("Không tải được dữ liệu dashboard"); })
-      .finally(() => { if (!ctrl.signal.aborted) setLoading(false); });
-    return () => ctrl.abort();
+      } catch {
+        if (active) setError("Không tải được dữ liệu dashboard");
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    loadDashboard();
+    return () => { active = false; };
   }, [rangePreset, model, supplier]);
 
   const range = useMemo(() => {
