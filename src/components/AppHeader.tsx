@@ -15,9 +15,12 @@ const nav = [
   { href: "/settings", label: "Settings" },
 ];
 
+type Me = { username: string; fullName: string; role: string } | null;
+
 export default function AppHeader() {
   const pathname = usePathname();
   const [isMobile, setIsMobile] = useState(false);
+  const [me, setMe] = useState<Me>(null);
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 900);
@@ -25,6 +28,15 @@ export default function AppHeader() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
+  useEffect(() => {
+    fetch("/api/auth/me").then((r) => r.json()).then((d) => setMe(d.user || null)).catch(() => setMe(null));
+  }, [pathname]);
+
+  const logout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login";
+  };
 
   if (pathname === "/login") return null;
 
@@ -42,7 +54,10 @@ export default function AppHeader() {
             );
           })}
         </nav>
-        {!isMobile ? <div style={{ marginLeft: "auto", fontSize: 13, color: "#6b7280" }}>User: Admin</div> : null}
+        {!isMobile ? <div style={{ marginLeft: "auto", fontSize: 13, color: "#6b7280", display: "flex", gap: 8, alignItems: "center" }}>
+          <span>User: {me ? `${me.fullName} (${me.role})` : "Chưa đăng nhập"}</span>
+          {me ? <button onClick={logout} style={{ border: "1px solid #cbd5e1", background: "#fff", borderRadius: 8, padding: "6px 8px", cursor: "pointer" }}>Thoát</button> : <Link href="/login">Đăng nhập</Link>}
+        </div> : null}
       </div>
     </header>
   );

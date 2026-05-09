@@ -9,10 +9,42 @@ const DELETE_CHANNEL = "__DELETE_CHANNEL__";
 export default function SettingsPage() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [msg, setMsg] = useState("");
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [userForm, setUserForm] = useState({ username: "", fullName: "", password: "", role: "SALES" });
+  const [userMsg, setUserMsg] = useState("");
 
   useEffect(() => {
     setSettings(getAppSettings());
+    loadUsers();
   }, []);
+
+  const loadUsers = async () => {
+    const res = await fetch("/api/users");
+    if (res.status === 401) {
+      window.location.href = "/login";
+      return;
+    }
+    if (res.status === 403) return setUserMsg("Chỉ Admin mới được quản lý tài khoản.");
+    const data = await res.json().catch(() => ({}));
+    setUsers(data.users || []);
+  };
+
+  const createUser = async () => {
+    setUserMsg("");
+    const res = await fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(userForm),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setUserMsg(data.error || "Không tạo được tài khoản.");
+      return;
+    }
+    setUserMsg("✅ Đã tạo tài khoản đăng nhập.");
+    setUserForm({ username: "", fullName: "", password: "", role: "SALES" });
+    loadUsers();
+  };
 
   const setField = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -97,6 +129,41 @@ export default function SettingsPage() {
       </section>
 
       <section style={card}>
+        <h3 style={title}>Tài khoản đăng nhập</h3>
+        <p style={{ marginTop: -4, color: "#64748b", fontSize: 13 }}>Chỉ tài khoản Admin/OWNER mới tạo được user mới. Mặc định lần đầu: <b>admin / 1234</b>.</p>
+        <div style={grid4}>
+          <label style={lab}>Username
+            <input className="input-clean" value={userForm.username} onChange={(e) => setUserForm((p) => ({ ...p, username: e.target.value.toLowerCase() }))} placeholder="vd: sale1" />
+          </label>
+          <label style={lab}>Tên hiển thị
+            <input className="input-clean" value={userForm.fullName} onChange={(e) => setUserForm((p) => ({ ...p, fullName: e.target.value }))} placeholder="vd: Nhân viên bán hàng" />
+          </label>
+          <label style={lab}>Mật khẩu
+            <input className="input-clean" type="password" value={userForm.password} onChange={(e) => setUserForm((p) => ({ ...p, password: e.target.value }))} placeholder="tối thiểu 4 ký tự" />
+          </label>
+          <label style={lab}>Quyền
+            <select className="input-clean" value={userForm.role} onChange={(e) => setUserForm((p) => ({ ...p, role: e.target.value }))}>
+              <option value="OWNER">Admin / full quyền</option>
+              <option value="SALES">Bán hàng</option>
+              <option value="TECHNICIAN">Kỹ thuật</option>
+              <option value="ACCOUNTANT">Kế toán</option>
+              <option value="VIEWER">Chỉ xem</option>
+            </select>
+          </label>
+        </div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12 }}>
+          <button className="primary-btn" type="button" onClick={createUser}>Tạo tài khoản</button>
+          {userMsg ? <span style={{ color: userMsg.startsWith("✅") ? "#166534" : "#b91c1c", fontWeight: 700 }}>{userMsg}</span> : null}
+        </div>
+        <div style={{ overflowX: "auto", marginTop: 12 }}>
+          <table className="excel-grid" style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+            <thead><tr><th>ID</th><th>Username</th><th>Tên</th><th>Quyền</th><th>Trạng thái</th><th>Ngày tạo</th></tr></thead>
+            <tbody>{users.map((u) => <tr key={u.id}><td>{u.id}</td><td>{u.username}</td><td>{u.fullName}</td><td>{u.role}</td><td>{u.isActive ? "Active" : "Khóa"}</td><td>{new Date(u.createdAt).toLocaleString("vi-VN")}</td></tr>)}</tbody>
+          </table>
+        </div>
+      </section>
+
+      <section style={card}>
         <h3 style={title}>Cài đặt báo cáo</h3>
         <div style={grid3}>
           <VndInput label="Ngưỡng lãi tốt" value={settings.reportProfitGood} onChange={(v) => setField("reportProfitGood", v)} />
@@ -131,6 +198,8 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+type UserRow = { id: number; username: string; fullName: string; role: string; isActive: boolean; createdAt: string };
 
 function VndInput({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
   return (
