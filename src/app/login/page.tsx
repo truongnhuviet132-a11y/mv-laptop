@@ -25,7 +25,8 @@ export default function LoginPage() {
       setMsg(data.error || "Đăng nhập thất bại.");
       return;
     }
-    router.push("/settings");
+    const next = new URLSearchParams(window.location.search).get("next") || "/settings";
+    router.push(next);
     router.refresh();
   };
 
