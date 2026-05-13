@@ -28,6 +28,31 @@ type SortKey = keyof Row | "errorRate" | "suggestion";
 
 const money = (n: number) => `${new Intl.NumberFormat("vi-VN").format(Math.round(n || 0))} đ`;
 const pct = (n: number) => `${Number(n || 0).toFixed(2)}%`;
+const REPORT_FILTER_STORAGE_KEY = "mv-laptop:reports:filters:v1";
+const DEFAULT_FILTERS = { month: "", model: "ALL", supplier: "ALL", profitMin: 0, profitMax: 999999999, errorMax: 100 };
+type ReportFilterState = typeof DEFAULT_FILTERS;
+const safeNumber = (v: unknown, fallback: number) => { const n = Number(v); return Number.isFinite(n) ? n : fallback; };
+function readSavedFilters(): Partial<ReportFilterState> {
+  if (typeof window === "undefined") return {};
+  const saved: Partial<ReportFilterState> = {};
+  try { const raw = window.localStorage.getItem(REPORT_FILTER_STORAGE_KEY); if (raw) Object.assign(saved, JSON.parse(raw)); } catch {}
+  const q = new URLSearchParams(window.location.search);
+  if (q.get("month")) saved.month = q.get("month") || undefined;
+  if (q.get("model")) saved.model = q.get("model") || "ALL";
+  if (q.get("supplier")) saved.supplier = q.get("supplier") || "ALL";
+  if (q.get("profitMin") != null) saved.profitMin = safeNumber(q.get("profitMin"), DEFAULT_FILTERS.profitMin);
+  if (q.get("profitMax") != null) saved.profitMax = safeNumber(q.get("profitMax"), DEFAULT_FILTERS.profitMax);
+  if (q.get("errorMax") != null) saved.errorMax = safeNumber(q.get("errorMax"), DEFAULT_FILTERS.errorMax);
+  return saved;
+}
+function persistFilters(filters: ReportFilterState) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(REPORT_FILTER_STORAGE_KEY, JSON.stringify(filters));
+  const q = new URLSearchParams(window.location.search);
+  q.set("month", filters.month); q.set("model", filters.model); q.set("supplier", filters.supplier);
+  q.set("profitMin", String(filters.profitMin)); q.set("profitMax", String(filters.profitMax)); q.set("errorMax", String(filters.errorMax));
+  window.history.replaceState(null, "", `${window.location.pathname}?${q.toString()}`);
+}
 
 function suggestion(row: Row, cfg: { profitGood: number; profitBad: number; errorGood: number; errorBad: number }) {
   const errorRate = row.repairRate + row.warrantyRate;
@@ -78,6 +103,7 @@ export default function ReportsPage() {
   const [selected, setSelected] = useState<Row | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [detail, setDetail] = useState<any | null>(null);
+  const [hydratedFilters, setHydratedFilters] = useState(false);
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 900);
@@ -89,7 +115,27 @@ export default function ReportsPage() {
   useEffect(() => {
     const s = getAppSettings();
     const nowMonth = new Date().toISOString().slice(0, 7);
-    setMonth(nowMonth);
+    const saved = readSavedFilters();
+    const restored = {
+      month: saved.month || nowMonth,
+      model: saved.model || DEFAULT_FILTERS.model,
+      supplier: saved.supplier || DEFAULT_FILTERS.supplier,
+      profitMin: safeNumber(saved.profitMin, DEFAULT_FILTERS.profitMin),
+      profitMax: safeNumber(saved.profitMax, DEFAULT_FILTERS.profitMax),
+      errorMax: safeNumber(saved.errorMax, DEFAULT_FILTERS.errorMax),
+    };
+    setMonth(restored.month);
+    setDraftModel(restored.model);
+    setDraftSupplier(restored.supplier);
+    setDraftProfitMin(restored.profitMin);
+    setDraftProfitMax(restored.profitMax);
+    setDraftErrorMax(restored.errorMax);
+    setModel(restored.model);
+    setSupplier(restored.supplier);
+    setProfitMin(restored.profitMin);
+    setProfitMax(restored.profitMax);
+    setErrorMax(restored.errorMax);
+    setHydratedFilters(true);
     setCfgProfitGood(s.reportProfitGood);
     setCfgProfitBad(s.reportProfitBad);
     setCfgErrorGood(s.reportErrorGood);
@@ -98,6 +144,12 @@ export default function ReportsPage() {
   }, []);
 
   useEffect(() => {
+    if (!hydratedFilters) return;
+    persistFilters({ month, model, supplier, profitMin, profitMax, errorMax });
+  }, [month, model, supplier, profitMin, profitMax, errorMax, hydratedFilters]);
+
+  useEffect(() => {
+    if (!hydratedFilters) return;
     const load = async () => {
       setLoading(true);
       const res = await fetch(`/api/reports/model-supplier-performance?month=${month}`);
@@ -109,7 +161,7 @@ export default function ReportsPage() {
       setDetail(null);
     };
     load();
-  }, [month]);
+  }, [month, hydratedFilters]);
 
   const modelOptions = useMemo(() => ["ALL", ...Array.from(new Set(rows.map((r) => r.model)))], [rows]);
   const supplierOptions = useMemo(() => ["ALL", ...Array.from(new Set(rows.map((r) => r.supplier)))], [rows]);
@@ -175,11 +227,13 @@ export default function ReportsPage() {
 
 
   const applyFilters = () => {
-    setModel(draftModel);
-    setSupplier(draftSupplier);
-    setProfitMin(draftProfitMin);
-    setProfitMax(draftProfitMax);
-    setErrorMax(draftErrorMax);
+    const nextFilters = { month, model: draftModel, supplier: draftSupplier, profitMin: draftProfitMin, profitMax: draftProfitMax, errorMax: draftErrorMax };
+    setModel(nextFilters.model);
+    setSupplier(nextFilters.supplier);
+    setProfitMin(nextFilters.profitMin);
+    setProfitMax(nextFilters.profitMax);
+    setErrorMax(nextFilters.errorMax);
+    persistFilters(nextFilters);
   };
 
   const resetFilters = () => {
@@ -193,6 +247,7 @@ export default function ReportsPage() {
     setProfitMin(0);
     setProfitMax(999999999);
     setErrorMax(100);
+    persistFilters({ ...DEFAULT_FILTERS, month });
   };
 
   const loadDetail = async () => {
