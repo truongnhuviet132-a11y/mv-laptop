@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { getAppSettings } from "@/lib/appSettings";
+import { getAppSettings, saveAppSettings } from "@/lib/appSettings";
 
 type Row = {
   month: string;
@@ -26,11 +26,24 @@ type Row = {
 
 type SortKey = keyof Row | "errorRate" | "suggestion";
 
+type ReportFilterState = {
+  month: string;
+  model: string;
+  supplier: string;
+  profitMin: number;
+  profitMax: number;
+  errorMax: number;
+  cfgProfitGood: number;
+  cfgProfitBad: number;
+  cfgErrorGood: number;
+  cfgErrorBad: number;
+  cfgTurnoverGood: number;
+};
+
 const money = (n: number) => `${new Intl.NumberFormat("vi-VN").format(Math.round(n || 0))} đ`;
 const pct = (n: number) => `${Number(n || 0).toFixed(2)}%`;
 const REPORT_FILTER_STORAGE_KEY = "mv-laptop:reports:filters:v1";
-const DEFAULT_FILTERS = { month: "", model: "ALL", supplier: "ALL", profitMin: 0, profitMax: 999999999, errorMax: 100 };
-type ReportFilterState = typeof DEFAULT_FILTERS;
+const DEFAULT_FILTERS: ReportFilterState = { month: "", model: "ALL", supplier: "ALL", profitMin: 0, profitMax: 999999999, errorMax: 100, cfgProfitGood: 2000000, cfgProfitBad: 1000000, cfgErrorGood: 25, cfgErrorBad: 50, cfgTurnoverGood: 14 };
 const safeNumber = (v: unknown, fallback: number) => { const n = Number(v); return Number.isFinite(n) ? n : fallback; };
 function readSavedFilters(): Partial<ReportFilterState> {
   if (typeof window === "undefined") return {};
@@ -43,6 +56,11 @@ function readSavedFilters(): Partial<ReportFilterState> {
   if (q.get("profitMin") != null) saved.profitMin = safeNumber(q.get("profitMin"), DEFAULT_FILTERS.profitMin);
   if (q.get("profitMax") != null) saved.profitMax = safeNumber(q.get("profitMax"), DEFAULT_FILTERS.profitMax);
   if (q.get("errorMax") != null) saved.errorMax = safeNumber(q.get("errorMax"), DEFAULT_FILTERS.errorMax);
+  if (q.get("cfgProfitGood") != null) saved.cfgProfitGood = safeNumber(q.get("cfgProfitGood"), DEFAULT_FILTERS.cfgProfitGood);
+  if (q.get("cfgProfitBad") != null) saved.cfgProfitBad = safeNumber(q.get("cfgProfitBad"), DEFAULT_FILTERS.cfgProfitBad);
+  if (q.get("cfgErrorGood") != null) saved.cfgErrorGood = safeNumber(q.get("cfgErrorGood"), DEFAULT_FILTERS.cfgErrorGood);
+  if (q.get("cfgErrorBad") != null) saved.cfgErrorBad = safeNumber(q.get("cfgErrorBad"), DEFAULT_FILTERS.cfgErrorBad);
+  if (q.get("cfgTurnoverGood") != null) saved.cfgTurnoverGood = safeNumber(q.get("cfgTurnoverGood"), DEFAULT_FILTERS.cfgTurnoverGood);
   return saved;
 }
 function persistFilters(filters: ReportFilterState) {
@@ -51,6 +69,8 @@ function persistFilters(filters: ReportFilterState) {
   const q = new URLSearchParams(window.location.search);
   q.set("month", filters.month); q.set("model", filters.model); q.set("supplier", filters.supplier);
   q.set("profitMin", String(filters.profitMin)); q.set("profitMax", String(filters.profitMax)); q.set("errorMax", String(filters.errorMax));
+  q.set("cfgProfitGood", String(filters.cfgProfitGood)); q.set("cfgProfitBad", String(filters.cfgProfitBad));
+  q.set("cfgErrorGood", String(filters.cfgErrorGood)); q.set("cfgErrorBad", String(filters.cfgErrorBad)); q.set("cfgTurnoverGood", String(filters.cfgTurnoverGood));
   window.history.replaceState(null, "", `${window.location.pathname}?${q.toString()}`);
 }
 
@@ -116,13 +136,18 @@ export default function ReportsPage() {
     const s = getAppSettings();
     const nowMonth = new Date().toISOString().slice(0, 7);
     const saved = readSavedFilters();
-    const restored = {
+    const restored: ReportFilterState = {
       month: saved.month || nowMonth,
       model: saved.model || DEFAULT_FILTERS.model,
       supplier: saved.supplier || DEFAULT_FILTERS.supplier,
       profitMin: safeNumber(saved.profitMin, DEFAULT_FILTERS.profitMin),
       profitMax: safeNumber(saved.profitMax, DEFAULT_FILTERS.profitMax),
       errorMax: safeNumber(saved.errorMax, DEFAULT_FILTERS.errorMax),
+      cfgProfitGood: safeNumber(saved.cfgProfitGood, s.reportProfitGood),
+      cfgProfitBad: safeNumber(saved.cfgProfitBad, s.reportProfitBad),
+      cfgErrorGood: safeNumber(saved.cfgErrorGood, s.reportErrorGood),
+      cfgErrorBad: safeNumber(saved.cfgErrorBad, s.reportErrorBad),
+      cfgTurnoverGood: safeNumber(saved.cfgTurnoverGood, s.reportTurnoverGood),
     };
     setMonth(restored.month);
     setDraftModel(restored.model);
@@ -135,18 +160,18 @@ export default function ReportsPage() {
     setProfitMin(restored.profitMin);
     setProfitMax(restored.profitMax);
     setErrorMax(restored.errorMax);
+    setCfgProfitGood(restored.cfgProfitGood);
+    setCfgProfitBad(restored.cfgProfitBad);
+    setCfgErrorGood(restored.cfgErrorGood);
+    setCfgErrorBad(restored.cfgErrorBad);
+    setCfgTurnoverGood(restored.cfgTurnoverGood);
     setHydratedFilters(true);
-    setCfgProfitGood(s.reportProfitGood);
-    setCfgProfitBad(s.reportProfitBad);
-    setCfgErrorGood(s.reportErrorGood);
-    setCfgErrorBad(s.reportErrorBad);
-    setCfgTurnoverGood(s.reportTurnoverGood);
   }, []);
 
   useEffect(() => {
     if (!hydratedFilters) return;
-    persistFilters({ month, model, supplier, profitMin, profitMax, errorMax });
-  }, [month, model, supplier, profitMin, profitMax, errorMax, hydratedFilters]);
+    persistFilters({ month, model, supplier, profitMin, profitMax, errorMax, cfgProfitGood, cfgProfitBad, cfgErrorGood, cfgErrorBad, cfgTurnoverGood });
+  }, [month, model, supplier, profitMin, profitMax, errorMax, cfgProfitGood, cfgProfitBad, cfgErrorGood, cfgErrorBad, cfgTurnoverGood, hydratedFilters]);
 
   useEffect(() => {
     if (!hydratedFilters) return;
@@ -227,13 +252,15 @@ export default function ReportsPage() {
 
 
   const applyFilters = () => {
-    const nextFilters = { month, model: draftModel, supplier: draftSupplier, profitMin: draftProfitMin, profitMax: draftProfitMax, errorMax: draftErrorMax };
+    const nextFilters: ReportFilterState = { month, model: draftModel, supplier: draftSupplier, profitMin: draftProfitMin, profitMax: draftProfitMax, errorMax: draftErrorMax, cfgProfitGood, cfgProfitBad, cfgErrorGood, cfgErrorBad, cfgTurnoverGood };
     setModel(nextFilters.model);
     setSupplier(nextFilters.supplier);
     setProfitMin(nextFilters.profitMin);
     setProfitMax(nextFilters.profitMax);
     setErrorMax(nextFilters.errorMax);
     persistFilters(nextFilters);
+    const s = getAppSettings();
+    saveAppSettings({ ...s, reportProfitGood: cfgProfitGood, reportProfitBad: cfgProfitBad, reportErrorGood: cfgErrorGood, reportErrorBad: cfgErrorBad, reportTurnoverGood: cfgTurnoverGood });
   };
 
   const resetFilters = () => {
@@ -247,7 +274,14 @@ export default function ReportsPage() {
     setProfitMin(0);
     setProfitMax(999999999);
     setErrorMax(100);
+    setCfgProfitGood(DEFAULT_FILTERS.cfgProfitGood);
+    setCfgProfitBad(DEFAULT_FILTERS.cfgProfitBad);
+    setCfgErrorGood(DEFAULT_FILTERS.cfgErrorGood);
+    setCfgErrorBad(DEFAULT_FILTERS.cfgErrorBad);
+    setCfgTurnoverGood(DEFAULT_FILTERS.cfgTurnoverGood);
     persistFilters({ ...DEFAULT_FILTERS, month });
+    const s = getAppSettings();
+    saveAppSettings({ ...s, reportProfitGood: DEFAULT_FILTERS.cfgProfitGood, reportProfitBad: DEFAULT_FILTERS.cfgProfitBad, reportErrorGood: DEFAULT_FILTERS.cfgErrorGood, reportErrorBad: DEFAULT_FILTERS.cfgErrorBad, reportTurnoverGood: DEFAULT_FILTERS.cfgTurnoverGood });
   };
 
   const loadDetail = async () => {
